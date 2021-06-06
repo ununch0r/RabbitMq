@@ -8,6 +8,13 @@ using MicroRabbit.Banking.Domain.Commands;
 using MicroRabbit.Banking.Domain.Interfaces;
 using MicroRabbit.Domain.Core.Bus;
 using MicroRabbit.Infrastructure.Bus;
+using MicroRabbit.Transfer.Application.Interfaces;
+using MicroRabbit.Transfer.Application.Services;
+using MicroRabbit.Transfer.Data.Context;
+using MicroRabbit.Transfer.Data.Repository;
+using MicroRabbit.Transfer.Domain.EventHandlers;
+using MicroRabbit.Transfer.Domain.Events;
+using MicroRabbit.Transfer.Domain.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MicroRabbit.Infrastructure.IoC
@@ -17,17 +24,32 @@ namespace MicroRabbit.Infrastructure.IoC
         public static void RegisterServices(IServiceCollection services)
         {
             //Domain bus
-            services.AddTransient<IEventBus, RabbitMqBus>();
+            services.AddSingleton<IEventBus, RabbitMqBus>(sp =>
+            {
+                var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
+                return new RabbitMqBus(sp.GetService<IMediator>(), scopeFactory);
+            });
+
+            //Subscriptions
+            services.AddTransient<TransferEventHandler>();
 
             //Domain Banking Commands
             services.AddTransient<IRequestHandler<CreateTransferCommand, bool>, TransferCommandHandler>();
 
+            //Domain Transfer Events
+            services.AddTransient<IEventHandler<TransferCreatedEvent>, TransferEventHandler>();
+
             //Application services
             services.AddTransient<IAccountService, AccountService>();
+            services.AddTransient<ITransferService, TransferService>();
 
             //Data
             services.AddTransient<IAccountRepository, AccountRepository>();
-            services.AddTransient<BankingDbContext>(); 
+            services.AddTransient<ITransferRepository, TransferRepository>();
+
+            //Db context
+            services.AddTransient<BankingDbContext>();
+            services.AddTransient<TransferDbContext>();
         }
     }
 }
